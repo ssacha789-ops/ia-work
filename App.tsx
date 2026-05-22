@@ -3,11 +3,49 @@
 import { useState, useCallback } from 'react'
 
 /* ─── Types ─── */
-type Screen = 'landing' | 'auth' | 'app' | 'result'
+type Screen = 'landing' | 'auth' | 'app' | 'subjects' | 'result'
 type AuthTab = 'login' | 'signup'
-type Action = 'résumé' | 'quiz' | 'fiche'
+type Action = 'résumé' | 'quiz' | 'fiche' | 'leçon'
 type QuizItem = { q: string; opts: string[]; ans: number; explication: string }
 type User = { name: string; email: string }
+
+type Subject = 'math' | 'français' | 'histoire' | 'science' | 'anglais'
+type Theme = { id: string; name: string; subject: Subject }
+
+/* ─── Sujets et thèmes disponibles ─── */
+const SUBJECTS_THEMES: Record<Subject, Theme[]> = {
+  math: [
+    { id: 'geom', name: 'Géométrie', subject: 'math' },
+    { id: 'percent', name: 'Pourcentages', subject: 'math' },
+    { id: 'trigo', name: 'Trigonométrie', subject: 'math' },
+    { id: 'algebre', name: 'Algèbre', subject: 'math' },
+    { id: 'calcul', name: 'Calcul & Dérivées', subject: 'math' },
+    { id: 'stats', name: 'Statistiques', subject: 'math' },
+  ],
+  français: [
+    { id: 'gram', name: 'Grammaire', subject: 'français' },
+    { id: 'conj', name: 'Conjugaison', subject: 'français' },
+    { id: 'orth', name: 'Orthographe', subject: 'français' },
+    { id: 'litt', name: 'Littérature', subject: 'français' },
+  ],
+  histoire: [
+    { id: 'antiq', name: 'Antiquité', subject: 'histoire' },
+    { id: 'moyen', name: 'Moyen Âge', subject: 'histoire' },
+    { id: 'mod', name: 'Période Moderne', subject: 'histoire' },
+    { id: 'cont', name: 'Époque Contemporaine', subject: 'histoire' },
+  ],
+  science: [
+    { id: 'phys', name: 'Physique', subject: 'science' },
+    { id: 'chim', name: 'Chimie', subject: 'science' },
+    { id: 'bio', name: 'Biologie', subject: 'science' },
+  ],
+  anglais: [
+    { id: 'vocab', name: 'Vocabulaire', subject: 'anglais' },
+    { id: 'gram_en', name: 'Grammaire', subject: 'anglais' },
+    { id: 'pron', name: 'Prononciation', subject: 'anglais' },
+    { id: 'conv', name: 'Conversation', subject: 'anglais' },
+  ],
+}
 
 /* ─── Styles (inline — zero external deps) ─── */
 const S = {
@@ -26,6 +64,14 @@ function cap(s: string) { return s.charAt(0).toUpperCase() + s.slice(1) }
 function greet() {
   const h = new Date().getHours()
   return h < 12 ? 'Bonjour' : h < 18 ? 'Bonjour' : 'Bonsoir'
+}
+
+const SUBJECT_LABELS: Record<Subject, { name: string; icon: string }> = {
+  math: { name: 'Mathématiques', icon: '📐' },
+  français: { name: 'Français', icon: '📚' },
+  histoire: { name: 'Histoire', icon: '🏛️' },
+  science: { name: 'Science', icon: '🧪' },
+  anglais: { name: 'Anglais', icon: '🌍' },
 }
 
 /* ════════════════════════════════════════════
@@ -140,7 +186,7 @@ function Landing({ onLogin, onDemo }: { onLogin: () => void; onDemo: () => void 
         </h1>
 
         <p style={{ ...S.muted, fontSize: 15, lineHeight: 1.7, maxWidth: 300, fontWeight: 300 }}>
-          Colle ton cours, l'IA crée des quiz, des résumés et des fiches en quelques secondes.
+          Choisis une matière, sélectionne un thème, et l'IA crée une leçon + un quiz en quelques secondes.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 280, marginTop: 8 }}>
@@ -156,9 +202,9 @@ function Landing({ onLogin, onDemo }: { onLogin: () => void; onDemo: () => void 
       {/* Features */}
       <div style={{ padding: '0 24px 40px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {[
-          { icon: '⚡', title: 'Résumé instantané', desc: "L'essentiel de ton cours en quelques lignes claires." },
-          { icon: '🎯', title: 'Quiz personnalisé', desc: 'Des questions générées depuis ton propre contenu.' },
-          { icon: '📋', title: 'Fiche de révision', desc: 'Structure parfaite pour mémoriser efficacement.' },
+          { icon: '⚡', title: 'Leçon personnalisée', desc: "L'IA crée une leçon complète sur ton thème." },
+          { icon: '🎯', title: 'Quiz instantané', desc: 'Questions générées pour tester ta compréhension.' },
+          { icon: '📚', title: 'Plusieurs matières', desc: 'Maths, Français, Histoire, Science, Anglais...' },
         ].map((f, i) => (
           <div key={i} style={{
             ...S.surface, padding: '18px', display: 'flex', gap: 14, alignItems: 'flex-start',
@@ -265,54 +311,21 @@ function Auth({
 }
 
 /* ════════════════════════════════════════════
-   SCREEN: APP (dashboard)
+   SCREEN: APP (dashboard with subjects)
 ════════════════════════════════════════════ */
-const DEMO_COURSE = `La photosynthèse est le processus biologique par lequel les végétaux chlorophylliens convertissent l'énergie lumineuse du soleil en énergie chimique stockée dans le glucose.
-
-Elle se déroule dans les chloroplastes des cellules végétales et comprend deux phases :
-
-1. Phase lumineuse : La chlorophylle absorbe la lumière, ce qui provoque la photolyse de l'eau. L'énergie lumineuse est convertie en ATP et NADPH. Le dioxygène (O₂) est libéré comme sous-produit.
-
-2. Cycle de Calvin (phase sombre) : Le CO₂ est fixé grâce à l'enzyme RuBisCO. L'ATP et le NADPH produisent du glucose (C₆H₁₂O₆).
-
-Équation bilan : 6CO₂ + 6H₂O + lumière → C₆H₁₂O₆ + 6O₂
-
-La photosynthèse est fondamentale : elle produit l'oxygène atmosphérique et est le point d'entrée de l'énergie dans les chaînes alimentaires.`
-
 function AppDashboard({
-  user, onLogout, onAction,
+  user, onLogout, onSelectTheme,
 }: {
   user: User
   onLogout: () => void
-  onAction: (action: Action, course: string) => void
+  onSelectTheme: (subject: Subject, theme: Theme) => void
 }) {
-  const [course, setCourse] = useState('')
   const [toast, setToast] = useState('')
 
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(''), 2500)
   }
-
-  async function paste() {
-    try {
-      const text = await navigator.clipboard.readText()
-      if (text) { setCourse(text); showToast('Cours collé ✓') }
-    } catch {
-      showToast('Colle avec Ctrl+V dans le champ')
-    }
-  }
-
-  function run(action: Action) {
-    if (course.trim().length < 20) return showToast('Colle un cours d\'abord !')
-    onAction(action, course)
-  }
-
-  const actions: { action: Action; icon: string; title: string; desc: string; full?: boolean }[] = [
-    { action: 'résumé', icon: '⚡', title: 'Résumer', desc: 'Points clés en 5 lignes' },
-    { action: 'quiz',   icon: '🎯', title: 'Créer un Quiz', desc: '5 QCM sur ton cours' },
-    { action: 'fiche',  icon: '📋', title: 'Fiche de révision complète', desc: 'Structure mémo optimisée pour l\'examen', full: true },
-  ]
 
   return (
     <div style={{ ...S.screen, background: '#0a0a0a' }}>
@@ -341,153 +354,158 @@ function AppDashboard({
         </button>
       </header>
 
-      {/* Course input */}
-      <div style={{ margin: '20px 24px 0', ...S.surface, animation: 'fadeUp 0.4s 0.05s both' }}>
+      {/* Matières */}
+      <div style={{ flex: 1, padding: '20px 24px', overflowY: 'auto' }}>
+        <p style={{ ...S.muted, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 16 }}>
+          Choisir une matière
+        </p>
+        
         <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '12px 16px', borderBottom: '1px solid #1a1a1a',
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
+          marginBottom: 32,
         }}>
-          <span style={{ fontSize: 11, color: '#555', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-            Ton cours
-          </span>
-          <button onClick={paste} style={{
-            background: 'transparent', border: '1px solid #2a2a2a', color: '#555',
-            padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
-            transition: 'all 0.2s',
-          }}>
-            📋 Coller
-          </button>
+          {(Object.keys(SUBJECTS_THEMES) as Subject[]).map((subject, i) => {
+            const info = SUBJECT_LABELS[subject]
+            return (
+              <button
+                key={subject}
+                onClick={() => {
+                  // Navigue vers la sélection de thème
+                  onSelectTheme(subject, SUBJECTS_THEMES[subject][0])
+                }}
+                style={{
+                  ...S.surface,
+                  padding: 20, cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  justifyContent: 'center', gap: 10,
+                  transition: 'background 0.2s, transform 0.2s',
+                  animation: `fadeUp 0.4s ${0.1 + i * 0.06}s both`,
+                  borderRadius: 20,
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.background = '#1a1a1a'
+                  ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.background = '#111'
+                  ;(e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
+                }}
+              >
+                <span style={{ fontSize: 32 }}>{info.icon}</span>
+                <span style={{ fontSize: 14, fontWeight: 500 }}>{info.name}</span>
+              </button>
+            )
+          })}
         </div>
-        <textarea
-          value={course}
-          onChange={e => setCourse(e.target.value)}
-          placeholder={"Colle ou écris ton cours ici…\n\nEx : La photosynthèse est le processus par lequel les plantes…"}
-          rows={6}
-          style={{
-            width: '100%', background: 'transparent', border: 'none', color: '#f0f0f0',
-            fontFamily: 'inherit', fontSize: 13, lineHeight: 1.7, padding: 16,
-            resize: 'none', outline: 'none',
-          }}
-        />
-      </div>
-
-      {/* Demo filler */}
-      {!course && (
-        <button
-          onClick={() => setCourse(DEMO_COURSE)}
-          style={{
-            background: 'none', border: 'none', color: '#333', fontSize: 12,
-            cursor: 'pointer', padding: '8px 24px', textAlign: 'left', fontFamily: 'inherit',
-          }}
-        >
-          ↑ Utiliser le cours de démo
-        </button>
-      )}
-
-      {/* Action cards */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
-        padding: '16px 24px 32px',
-      }}>
-        {actions.map(({ action, icon, title, desc, full }, i) => (
-          <div
-            key={action}
-            onClick={() => run(action)}
-            style={{
-              ...S.surface,
-              gridColumn: full ? '1 / -1' : undefined,
-              padding: 18, cursor: 'pointer',
-              display: 'flex',
-              flexDirection: full ? 'row' : 'column',
-              alignItems: full ? 'center' : 'flex-start',
-              justifyContent: full ? 'space-between' : undefined,
-              gap: full ? 0 : 10,
-              transition: 'background 0.2s, transform 0.2s',
-              animation: `fadeUp 0.4s ${0.1 + i * 0.06}s both`,
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = '#1a1a1a'
-              ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = '#111'
-              ;(e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
-            }}
-          >
-            <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: 12, background: '#1a1a1a',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0,
-              }}>{icon}</div>
-              {full && (
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{title}</div>
-                  <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>{desc}</div>
-                </div>
-              )}
-            </div>
-            {!full && (
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{title}</div>
-                <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>{desc}</div>
-              </div>
-            )}
-            {full && <span style={{ color: '#444', fontSize: 20 }}>→</span>}
-          </div>
-        ))}
       </div>
     </div>
   )
 }
 
 /* ════════════════════════════════════════════
-   SCREEN: RESULT
+   SCREEN: SUBJECTS (theme selection)
+════════════════════════════════════════════ */
+function SubjectsScreen({
+  subject, onBack, onSelectTheme, onAction,
+}: {
+  subject: Subject
+  onBack: () => void
+  onSelectTheme: (theme: Theme) => void
+  onAction: (theme: Theme) => void
+}) {
+  const themes = SUBJECTS_THEMES[subject]
+  const subjectInfo = SUBJECT_LABELS[subject]
+  const [selectedTheme, setSelectedTheme] = useState<Theme | null>(themes[0])
+
+  return (
+    <div style={{ ...S.screen, background: '#0a0a0a' }}>
+      {/* Header */}
+      <div style={{
+        padding: '20px 24px 16px', borderBottom: '1px solid #1a1a1a',
+        display: 'flex', alignItems: 'center', gap: 12,
+        animation: 'fadeIn 0.3s both',
+      }}>
+        <button onClick={onBack} style={{
+          width: 36, height: 36, borderRadius: 10, background: 'transparent',
+          border: '1px solid #2a2a2a', color: '#555', cursor: 'pointer', fontSize: 18,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>←</button>
+        <span style={{ ...S.serif, fontSize: 18 }}>
+          {subjectInfo.icon} {subjectInfo.name}
+        </span>
+      </div>
+
+      {/* Thèmes */}
+      <div style={{ flex: 1, padding: '20px 24px', overflowY: 'auto' }}>
+        <p style={{ ...S.muted, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 16 }}>
+          Choisir un thème
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+          {themes.map((theme, i) => (
+            <button
+              key={theme.id}
+              onClick={() => setSelectedTheme(theme)}
+              style={{
+                ...S.surface,
+                padding: 16, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                transition: 'all 0.2s',
+                animation: `fadeUp 0.4s ${0.1 + i * 0.06}s both`,
+                background: selectedTheme?.id === theme.id ? '#1a1a1a' : '#111',
+                borderColor: selectedTheme?.id === theme.id ? '#444' : '#222',
+              }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 500 }}>{theme.name}</span>
+              <span style={{ color: '#555', fontSize: 18 }}>
+                {selectedTheme?.id === theme.id ? '✓' : '→'}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {selectedTheme && (
+          <Btn
+            full
+            onClick={() => onAction(selectedTheme)}
+            style={{ padding: '15px', fontSize: 15, marginTop: 16 }}
+          >
+            Générer leçon + quiz 🚀
+          </Btn>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════
+   SCREEN: RESULT (Lesson + Quiz)
 ════════════════════════════════════════════ */
 function Result({
-  action, content, loading, onBack,
+  theme, lessonContent, quizContent, loading, onBack,
 }: {
-  action: Action
-  content: string
+  theme: Theme
+  lessonContent: string
+  quizContent: string
   loading: boolean
   onBack: () => void
 }) {
   const [quizData, setQuizData] = useState<QuizItem[] | null>(null)
   const [answered, setAnswered] = useState<Record<number, number>>({})
-  const [parseErr, setParseErr] = useState(false)
+  const [tab, setTab] = useState<'lesson' | 'quiz'>('lesson')
 
-  // Parse quiz JSON when content arrives
-  useState(() => {
-    if (action === 'quiz' && content && !loading) {
-      try {
-        const clean = content.replace(/```json|```/g, '').trim()
-        setQuizData(JSON.parse(clean))
-      } catch {
-        setParseErr(true)
-      }
-    }
-  })
-
-  // Re-parse when content changes
+  // Parse quiz JSON
   const parsedQuiz = useCallback(() => {
-    if (action !== 'quiz' || !content || loading) return null
+    if (!quizContent || loading) return null
     try {
-      const clean = content.replace(/```json|```/g, '').trim()
+      const clean = quizContent.replace(/```json|```/g, '').trim()
       return JSON.parse(clean) as QuizItem[]
     } catch {
       return null
     }
-  }, [action, content, loading])
+  }, [quizContent, loading])
 
   const quiz = parsedQuiz()
-
-  const titles: Record<Action, string> = { résumé: 'Résumé', quiz: 'Quiz', fiche: 'Fiche de révision' }
-  const tags:   Record<Action, string> = { résumé: 'Résumé IA', quiz: '5 questions', fiche: 'Mémo' }
-  const loadMsgs: Record<Action, string> = {
-    résumé: 'Résumé en cours…',
-    quiz: 'Génération du quiz…',
-    fiche: 'Création de la fiche…',
-  }
 
   function answer(qi: number, oi: number) {
     if (answered[qi] !== undefined) return
@@ -507,11 +525,37 @@ function Result({
           border: '1px solid #2a2a2a', color: '#555', cursor: 'pointer', fontSize: 18,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>←</button>
-        <span style={{ ...S.serif, fontSize: 18 }}>{titles[action]}</span>
+        <span style={{ ...S.serif, fontSize: 18 }}>{theme.name}</span>
         <span style={{
           marginLeft: 'auto', background: '#1a1a1a', border: '1px solid #2a2a2a',
           padding: '4px 12px', borderRadius: 20, fontSize: 11, color: '#555',
-        }}>{tags[action]}</span>
+        }}>Leçon + Quiz</span>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #1a1a1a', padding: '0 24px' }}>
+        <button
+          onClick={() => setTab('lesson')}
+          style={{
+            flex: 1, padding: '12px', borderBottom: tab === 'lesson' ? '2px solid #f0f0f0' : '2px solid transparent',
+            background: 'none', border: 'none', color: tab === 'lesson' ? '#f0f0f0' : '#555',
+            cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
+            transition: 'all 0.2s',
+          }}
+        >
+          📖 Leçon
+        </button>
+        <button
+          onClick={() => setTab('quiz')}
+          style={{
+            flex: 1, padding: '12px', borderBottom: tab === 'quiz' ? '2px solid #f0f0f0' : '2px solid transparent',
+            background: 'none', border: 'none', color: tab === 'quiz' ? '#f0f0f0' : '#555',
+            cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
+            transition: 'all 0.2s',
+          }}
+        >
+          🎯 Quiz
+        </button>
       </div>
 
       {/* Body */}
@@ -522,9 +566,19 @@ function Result({
               width: 32, height: 32, border: '2px solid #2a2a2a', borderTopColor: '#f0f0f0',
               borderRadius: '50%', animation: 'spin 0.7s linear infinite',
             }} />
-            <p style={{ ...S.muted, fontSize: 13 }}>{loadMsgs[action]}</p>
+            <p style={{ ...S.muted, fontSize: 13 }}>
+              {tab === 'lesson' ? 'Génération de la leçon…' : 'Génération du quiz…'}
+            </p>
           </div>
-        ) : action === 'quiz' && quiz ? (
+        ) : tab === 'lesson' ? (
+          <div
+            style={{
+              ...S.surface, padding: 20, fontSize: 13, lineHeight: 1.8, color: '#ccc',
+              animation: 'fadeUp 0.4s both',
+            }}
+            dangerouslySetInnerHTML={{ __html: lessonContent }}
+          />
+        ) : quiz ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {quiz.map((q, qi) => (
               <div key={qi} style={{ ...S.surface, padding: 20, animation: `fadeUp 0.4s ${qi * 0.08}s both` }}>
@@ -561,17 +615,13 @@ function Result({
             ))}
           </div>
         ) : (
-          <div
-            style={{
-              ...S.surface, padding: 20, fontSize: 13, lineHeight: 1.8, color: '#ccc',
-              animation: 'fadeUp 0.4s both',
-            }}
-            dangerouslySetInnerHTML={{ __html: content }}
-          />
+          <div style={{ ...S.surface, padding: 20, color: '#f87171', textAlign: 'center' }}>
+            Erreur de génération du quiz. Réessaye.
+          </div>
         )}
       </div>
 
-      {/* Inline style for result HTML content */}
+      {/* Inline styles */}
       <style>{`
         .result-body h2 { font-family: "DM Serif Display", Georgia, serif; font-size: 18px; margin: 16px 0 8px; color: #f0f0f0; }
         .result-body h3 { font-size: 14px; font-weight: 600; margin: 14px 0 6px; color: #ddd; }
@@ -579,6 +629,7 @@ function Result({
         .result-body strong { color: #f0f0f0; }
         .result-body ul { padding-left: 16px; color: #999; }
         .result-body li { margin-bottom: 5px; }
+        .result-body ol { padding-left: 16px; color: #999; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -593,16 +644,25 @@ function Result({
 export default function App() {
   const [screen, setScreen] = useState<Screen>('landing')
   const [user, setUser] = useState<User | null>(null)
-  const [action, setAction] = useState<Action>('résumé')
-  const [resultContent, setResultContent] = useState('')
+  const [currentSubject, setCurrentSubject] = useState<Subject | null>(null)
+  const [currentTheme, setCurrentTheme] = useState<Theme | null>(null)
+  const [lessonContent, setLessonContent] = useState('')
+  const [quizContent, setQuizContent] = useState('')
   const [resultLoading, setResultLoading] = useState(false)
 
   function enterApp(u: User) { setUser(u); setScreen('app') }
   function logout() { setUser(null); setScreen('landing') }
 
-  async function handleAction(act: Action, course: string) {
-    setAction(act)
-    setResultContent('')
+  function handleSelectTheme(subject: Subject, theme: Theme) {
+    setCurrentSubject(subject)
+    setCurrentTheme(theme)
+    setScreen('subjects')
+  }
+
+  async function handleAction(theme: Theme) {
+    setCurrentTheme(theme)
+    setLessonContent('')
+    setQuizContent('')
     setResultLoading(true)
     setScreen('result')
 
@@ -610,12 +670,18 @@ export default function App() {
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ course, action: act }),
+        body: JSON.stringify({ 
+          action: 'lesson_quiz',
+          theme: theme.name,
+          subject: currentSubject,
+        }),
       })
       const data = await res.json()
-      setResultContent(data.result || data.error || 'Erreur inconnue')
-    } catch {
-      setResultContent('<p>Erreur de connexion. Vérifie ta connexion internet.</p>')
+      setLessonContent(data.lesson || '')
+      setQuizContent(data.quiz || '')
+    } catch (err) {
+      setLessonContent('<p>Erreur de connexion. Réessaye.</p>')
+      setQuizContent('')
     } finally {
       setResultLoading(false)
     }
@@ -636,12 +702,21 @@ export default function App() {
         <Auth onBack={() => setScreen('landing')} onEnter={enterApp} />
       )}
       {screen === 'app' && user && (
-        <AppDashboard user={user} onLogout={logout} onAction={handleAction} />
+        <AppDashboard user={user} onLogout={logout} onSelectTheme={handleSelectTheme} />
       )}
-      {screen === 'result' && (
+      {screen === 'subjects' && currentSubject && (
+        <SubjectsScreen
+          subject={currentSubject}
+          onBack={() => setScreen('app')}
+          onSelectTheme={(theme) => setCurrentTheme(theme)}
+          onAction={handleAction}
+        />
+      )}
+      {screen === 'result' && currentTheme && (
         <Result
-          action={action}
-          content={resultContent}
+          theme={currentTheme}
+          lessonContent={lessonContent}
+          quizContent={quizContent}
           loading={resultLoading}
           onBack={() => setScreen('app')}
         />
